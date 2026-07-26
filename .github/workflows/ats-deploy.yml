@@ -1,0 +1,41 @@
+name: ATS 2.0 Local Integration Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch: # 支援在 GitHub 網頁上點擊按鈕手動觸發 CI/CD
+
+jobs:
+  ats-test-and-deploy:
+    # 指定派發給我們剛剛架設好的地端 Self-hosted Runner
+    runs-on: [ self-hosted, ats-2.0-runner ]
+
+    steps:
+      # 1. 自動拉取最新程式碼並清理工作區
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          clean: true
+
+      # 2. 測試地端 ATS 2.0 API (Port 8000) 健康狀態
+      - name: Check ATS 2.0 API Health Status
+        run: |
+          echo "=== 正在檢查地端 ATS 2.0 (127.0.0.1:8000) 連線狀態 ==="
+          
+          # 發起 curl 請求並取得 HTTP 回應碼
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000 || true)
+          
+          echo "ATS 2.0 回應狀態碼: $HTTP_STATUS"
+          
+          if [ "$HTTP_STATUS" -eq 200 ]; then
+            echo "✅ ATS 2.0 API 運作正常 (HTTP 200 OK)！"
+          else
+            echo "❌ ATS 2.0 連線失敗，請檢查 VM 內 ATS 服務是否掛掉！"
+            exit 1
+          fi
+
+      # 3. 執行地端測試或觸發自動化任務
+      - name: Trigger ATS 2.0 Task
+        run: |
+          echo "=== CI/CD 管道已成功打通地端 ATS 2.0 ==="
+          echo "Runner 正在 $(hostname) 上執行任務！"
