@@ -1,0 +1,49 @@
+name: ATS 2.0 Integration Test Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  # 建議加上 workflow_dispatch，方便日後手動在 GitHub 介面上點擊觸發測試
+  workflow_dispatch:
+
+jobs:
+  build-and-trigger-ats:
+    runs-on: self-hosted  # 運作於連得到 ATS 本地的 Runner
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build Test Suite Package
+        run: |
+          echo "📦 正在打包 Mobly 測試套件..."
+          # 確保包含測試腳本與設定檔
+          zip -r test-suite.zip ./tests config.yaml
+
+      - name: Deploy Test Suite to ATS Storage
+        run: |
+          STORAGE_DIR="$HOME/.ats_storage/ci_builds"
+          mkdir -p "$STORAGE_DIR"
+          cp test-suite.zip "$STORAGE_DIR/test-suite-${{ github.sha }}.zip"
+          echo "✅ 已部署至 $STORAGE_DIR/test-suite-${{ github.sha }}.zip"
+
+      - name: Trigger OmniLab ATS Test Run via API
+        run: |
+          ATS_API_URL="http://localhost:8000"
+          
+          # 使用 -f 讓 HTTP Error (如 404, 500) 自動讓 CI 步驟 Fail
+          # 使用 -sS 隱藏進度條但保留 Error 訊息
+          RESPONSE=$(curl -f -sS -X POST "${ATS_API_URL}/v1/testRuns" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "name": "CI Run - Commit ${{ github.sha }}",
+              "test_suite_id": "'"${ATS_TEST_SUITE_ID:-DEFAULT_SUITE_ID}"'",
+              "test_resources": [
+                {
+                  "name": "test_suite_zip",
+                  "path": "ci_builds/test-suite-'${{ github.sha }}'.zip"
+                }
+              ]
+            }')
+            
+          echo "🚀 ATS API 傳回結果: $RESPONSE"
