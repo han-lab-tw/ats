@@ -1,5 +1,0 @@
-TestBeds:
-  - Name: TabA8_ATS_TestBed
-    Controllers:
-      AndroidDevice:
-        - serial: "*"
