@@ -16,12 +16,14 @@ jobs:
         with:
           clean: true
 
-      # Step 2: 同步程式碼至共享目錄並修復權限
+      # Step 2: 同步程式碼至共享目錄並修復權限 (已去除帳號硬編碼)
       - name: Sync Code to Shared Workspace & Fix Permissions
         run: |
           echo "=== [Step 1] 同步測試腳本至 /opt/ats_mobly_workspace ==="
           sudo rsync -rtv --delete --exclude='.git' ./ /opt/ats_mobly_workspace/
-          sudo chown -R aiagent007:atsgroup /opt/ats_mobly_workspace
+          
+          # 僅設定共享群組 atsgroup，不硬編碼特定使用者帳號
+          sudo chgrp -R atsgroup /opt/ats_mobly_workspace
           sudo chmod -R 775 /opt/ats_mobly_workspace
           sudo chmod g+s /opt/ats_mobly_workspace
           echo "=== 共享目錄同步與權限設定完成 ==="
@@ -38,7 +40,7 @@ jobs:
             exit 1
           fi
 
-      # Step 4: 直接調用 Mobly / Python 執行三星 Tab A8 自動化測試
+      # Step 4: 調用 Mobly / Python 執行三星 Tab A8 自動化測試
       - name: Execute Mobly Test on Samsung Tab A8
         run: |
           echo "=== [Step 3] 開始對 Samsung Galaxy Tab A8 執行 Mobly 自動化測試 ==="
@@ -46,8 +48,8 @@ jobs:
           # 切換至共享工作目錄
           cd /opt/ats_mobly_workspace
 
-          # 載入 ATS 2.0 Python 虛擬環境並執行 Mobly 測試
-          source /home/aiagent007/ats_workspace/ats2_env/bin/activate
+          # 載入共享目錄下的 Python 虛擬環境 (避免指向個人家目錄)
+          source /opt/ats_mobly_workspace/venv/bin/activate
           
           # 執行 Mobly 測試腳本，並指定配置文件
           python3 tests/tab_a8_basic_test.py -c config.yaml
