@@ -1,41 +1,52 @@
-name: ATS 2.0 Local Integration Pipeline
+name: Mobly Test & ATS 2.0 CI/CD Pipeline
 
 on:
   push:
     branches: [ "main" ]
-  workflow_dispatch: # 支援在 GitHub 網頁上點擊按鈕手動觸發 CI/CD
+  workflow_dispatch: # 支援在 GitHub 頁面上點擊按鈕手動觸發
 
 jobs:
-  ats-test-and-deploy:
-    # 指定派發給我們剛剛架設好的地端 Self-hosted Runner
+  deploy-and-test:
+    # 指定使用 VirtualBox 內架設好的 Self-hosted Runner
     runs-on: [ self-hosted, ats-2.0-runner ]
 
     steps:
-      # 1. 自動拉取最新程式碼並清理工作區
-      - name: Checkout Repository
+      # 1. 清理並拉取最新 Commit 測試程式碼
+      - name: Checkout Mobly Test Code
         uses: actions/checkout@v4
         with:
           clean: true
 
-      # 2. 測試地端 ATS 2.0 API (Port 8000) 健康狀態
-      - name: Check ATS 2.0 API Health Status
+      # 2. 解決權限問題：同步至跨帳號共享目錄並設置 775 權限
+      - name: Sync Code to Shared Workspace & Fix Permissions
         run: |
-          echo "=== 正在檢查地端 ATS 2.0 (127.0.0.1:8000) 連線狀態 ==="
-          
-          # 發起 curl 請求並取得 HTTP 回應碼
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000 || true)
-          
-          echo "ATS 2.0 回應狀態碼: $HTTP_STATUS"
-          
-          if [ "$HTTP_STATUS" -eq 200 ]; then
-            echo "✅ ATS 2.0 API 運作正常 (HTTP 200 OK)！"
+          echo "=== [Step 1] 開始同步測試腳本至 /opt/ats_mobly_workspace ==="
+          rsync -av --delete --exclude='.git' ./ /opt/ats_mobly_workspace/
+
+          # 修正權限確保 aiagent007 (ATS 2.0) 具備完整讀寫與執行權限
+          sudo chmod -R 775 /opt/ats_mobly_workspace
+          sudo chown -R aiagent007:atsgroup /opt/ats_mobly_workspace
+          echo "=== [Step 1] 共享目錄同步與權限設定完成 ==="
+
+      # 3. 檢查本地端的 ATS 2.0 API 健康狀態
+      - name: Verify ATS 2.0 Service Health (Port 8000)
+        run: |
+          echo "=== [Step 2] 檢查 VirtualBox 本地 ATS 2.0 服務 (http://127.0.0.1:8000) ==="
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/)
+          if [ "$RESPONSE" -eq 200 ]; then
+            echo "ATS 2.0 API 狀態正常 (HTTP 200 OK)"
           else
-            echo "❌ ATS 2.0 連線失敗，請檢查 VM 內 ATS 服務是否掛掉！"
+            echo "Error: 無法存取 ATS 2.0 API，HTTP 回應碼: $RESPONSE"
             exit 1
           fi
 
-      # 3. 執行地端測試或觸發自動化任務
-      - name: Trigger ATS 2.0 Task
+      # 4. 觸發 ATS 2.0 執行 Mobly 測試腳本
+      - name: Trigger ATS 2.0 Execution
         run: |
-          echo "=== CI/CD 管道已成功打通地端 ATS 2.0 ==="
-          echo "Runner 正在 $(hostname) 上執行任務！"
+          echo "=== [Step 3] 派發 Mobly 測試任務給 ATS 2.0 ==="
+          curl -X POST http://127.0.0.1:8000/api/v1/test/run \
+            -H "Content-Type: application/json" -d '{
+              "test_path": "/opt/ats_mobly_workspace/tests/tab_a8_basic_test.py",
+              "config_path": "/opt/ats_mobly_workspace/config.yaml",
+              "device_target": "Samsung Galaxy Tab A8"
+            }'
