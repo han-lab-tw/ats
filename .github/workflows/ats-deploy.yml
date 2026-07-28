@@ -17,15 +17,17 @@ jobs:
         with:
           clean: true
 
-      # 2. 解決權限問題：同步至跨帳號共享目錄並設置 775 權限
+      # 2. 同步程式碼並修復權限 (改用 sudo + -rtv 避免權限與屬性複製衝突)
       - name: Sync Code to Shared Workspace & Fix Permissions
         run: |
           echo "=== [Step 1] 開始同步測試腳本至 /opt/ats_mobly_workspace ==="
-          rsync -av --delete --exclude='.git' ./ /opt/ats_mobly_workspace/
+          # 使用 sudo 搭配 -rtv ( Recursive, Times, Verbose ) 進行檔案同步
+          sudo rsync -rtv --delete --exclude='.git' ./ /opt/ats_mobly_workspace/
 
-          # 修正權限確保 aiagent007 (ATS 2.0) 具備完整讀寫與執行權限
-          sudo chmod -R 775 /opt/ats_mobly_workspace
+          # 統一將擁有者交還給 aiagent007，並確保 775 與 setgid 生效
           sudo chown -R aiagent007:atsgroup /opt/ats_mobly_workspace
+          sudo chmod -R 775 /opt/ats_mobly_workspace
+          sudo chmod g+s /opt/ats_mobly_workspace
           echo "=== [Step 1] 共享目錄同步與權限設定完成 ==="
 
       # 3. 檢查本地端的 ATS 2.0 API 健康狀態
