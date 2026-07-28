@@ -1,6 +1,5 @@
 TestBeds:
   - Name: TabA8TestBed
     Controllers:
-      AndroidDevice:
-        # 使用 '*' 自動識別已透過 USB Passthrough 連接至 VirtualBox 的 Tab A8
-        - serial: '*'
+      AndroidDevice: "*"
+        # 1. 寫入 Mobly 原生通配符語法
