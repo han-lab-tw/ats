@@ -1,5 +1,6 @@
 TestBeds:
-  - Name: TabA8_ATS_TestBed
+  - Name: TabA8TestBed
     Controllers:
       AndroidDevice:
-        - serial: "*"
+        # 使用 '*' 自動識別已透過 USB Passthrough 連接至 VirtualBox 的 Tab A8
+        - serial: '*'
